@@ -5,7 +5,7 @@ variable str_buff 40 allot
 0 str_len !
 0 stop_input !
 
-: intr_enter di
+:intr intr_enter di
     10 read
     dup 13 = if 1 stop_input ! else
         str_buff str_len @ + !
