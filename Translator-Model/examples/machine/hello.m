@@ -1,15 +1,32 @@
-0   PUSH '!'
-1   PUSH 'd'
-2   PUSH 'l'
-3   PUSH 'r'
-4   PUSH 'o'
-5   PUSH 'w'
-6   PUSH ' '
-7   PUSH 'o'
-8   PUSH 'l'
-9   PUSH 'l'
-10  PUSH 'e'
-11  PUSH 'h'
-12  PUSH 12
-13  PRINT
-14  HALT
+0   MOV 0 12
+1   MOV 1 'h'
+2   MOV 2 'e'
+3   MOV 3 'l'
+4   MOV 4 'l'
+5   MOV 5 'o'
+6   MOV 6 ' '
+7   MOV 7 'w'
+8   MOV 8 'o'
+9   MOV 9 'r'
+10  MOV 10 'l'
+11  MOV 11 'd'
+12  MOV 12 '!'
+
+13  PUSH 0
+14  LOAD
+15  DUP
+16  ZJMP 29
+17  DUP
+18  PUSH 0
+19  LOAD
+20  SWAP
+21  SUB
+22  PUSH 1
+23  ADD
+24  LOAD
+25  PUSH 11
+26  OMIT
+27  PUSH 1
+28  SUB
+
+29  HALT

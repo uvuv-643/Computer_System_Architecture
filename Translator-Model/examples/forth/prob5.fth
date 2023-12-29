@@ -8,3 +8,8 @@
 1
 21 1 do dup i * swap dup i gcd swap drop / loop
 11 .
+
+
+
+
+

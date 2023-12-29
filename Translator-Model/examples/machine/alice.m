@@ -3,32 +3,51 @@
 2   PUSH 0
 3   PUSH 10
 
-4   PUSH ' '
-5   PUSH ':'
-6   PUSH 'e'
-7   PUSH 'm'
-8   PUSH 'a'
-9   PUSH 'n'
-10  PUSH ' '
-11  PUSH 'r'
-12  PUSH 'u'
-13  PUSH 'o'
-14  PUSH 'y'
-15  PUSH ' '
-16  PUSH 'r'
-17  PUSH 'e'
-18  PUSH 't'
-19  PUSH 'n'
-20  PUSH 'e'
-21  PUSH ' '
-22  PUSH '!'
-23  PUSH 'o'
-24  PUSH 'l'
-25  PUSH 'l'
-26  PUSH 'e'
-27  PUSH 'h'
+4   MOV 0 5
+5   MOV 1 'n'
+6   MOV 2 'a'
+7   MOV 3 'm'
+8   MOV 4 'e'
+9   MOV 5 '?'
+10  MOV 6 '?'
+11  MOV 6 ' '
+
+12  PUSH 0
+13  LOAD
+14  DUP
+15  ZBR 29
+16  DUP
+17  PUSH 0
+18  LOAD
+19  SWAP
+20  SUB
+21  PUSH 1
+22  ADD
+23  LOAD
+24  PUSH 11
+25  OMIT
+26  PUSH 1
+27  SUB
+
 28  PUSH 24
 29  PRINT
+
+13  PUSH 0
+14  LOAD
+15  DUP
+16  ZBR 29
+17  DUP
+18  PUSH 0
+19  LOAD
+20  SWAP
+21  SUB
+22  PUSH 1
+23  ADD
+24  LOAD
+25  PUSH 11
+26  OMIT
+27  PUSH 1
+28  SUB
 
 30  PUSH 10
 31  LOAD
