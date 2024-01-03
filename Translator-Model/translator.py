@@ -6,7 +6,7 @@ variables = {}
 variable_current_address = 10
 
 
-def word2term(word: str) -> Term | None:
+def word_to_term(word: str) -> Term | None:
     return {
         'di': TermType.DI,
         'ei': TermType.EI,
@@ -46,7 +46,7 @@ def split_to_terms(source_code: str) -> list[Term]:
     code_words = source_code.split(' ')
     terms = []
     for word_number, word in enumerate(code_words):
-        term_type = word2term(word)
+        term_type = word_to_term(word)
         terms.append(Term(word_number, term_type, word))
     return terms
 
