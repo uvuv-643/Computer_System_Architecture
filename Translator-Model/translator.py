@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sys
 
 from isa import Term, TermType, write_code
@@ -87,18 +89,8 @@ def set_variables(terms: list[Term]) -> None:
             assert_with_line(terms[term_index + 1].term_type is None, "Variable name same as key", term.word_number + 1)
             assert_with_line(terms[term_index + 1].word[0].isalpha(), "Bad variable name", term.word_number + 1)
             assert_with_line(terms[term_index + 1] not in variables, "Variable already exists", term.word_number + 1)
-            allot_size = 1
-            if term_index + 3 < len(terms) and terms[term_index + 3].term_type is TermType.ALLOT:
-                terms[term_index + 2].converted = True
-                try:
-                    allot_size = int(terms[term_index + 2].word)
-                    assert_with_line(1 <= allot_size <= 100, "Incorrect allot size", term.word_number + 2)
-                    variables[terms[term_index + 1].word] = variable_current_address
-                    variable_current_address += allot_size
-                except ValueError:
-                    assert_with_line(True, "Incorrect allot size", term.word_number + 2)
             variables[terms[term_index + 1].word] = variable_current_address
-            variable_current_address += allot_size
+            variable_current_address += 1
             terms[term_index + 1].converted = True
 
     # replace variable name by actual address
@@ -106,6 +98,21 @@ def set_variables(terms: list[Term]) -> None:
         if term.term_type is None and not term.converted:
             if term.word in variables:
                 term.word = str(variables[term.word])
+
+
+def set_allot(terms: list[Term]) -> None:
+    global variable_current_address
+    for term_index, term in enumerate(terms):
+        # variable <name> [<size> allot]
+        if term.term_type is TermType.ALLOT:
+            assert_with_line(term_index - 3 >= 0, "Bad allot declaration", term.word_number)
+            terms[term_index - 1].converted = True
+            try:
+                allot_size = int(terms[term_index - 1].word)
+                assert_with_line(1 <= allot_size <= 100, "Incorrect allot size", term.word_number - 1)
+                variable_current_address += allot_size
+            except ValueError:
+                assert_with_line(True, "Incorrect allot size", term.word_number + 2)
 
 
 def set_if_else_then(terms: list[Term]) -> None:
@@ -135,6 +142,7 @@ def validate_and_fix_terms(terms: list[Term]) -> None:
     set_closed_indexes(terms, TermType.BEGIN, TermType.UNTIL, "Unbalanced begin ... until")
     set_closed_indexes_func(terms)
     set_variables(terms)
+    set_allot(terms)
     set_if_else_then(terms)
 
 
