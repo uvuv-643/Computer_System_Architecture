@@ -80,12 +80,15 @@ class TermType(Enum):
         BEGIN,
         UNTIL,
         LOOP_CNT,
-    ) = range(33)
+        CALL,
+        STRING,
+    ) = range(35)
 
 
 class Term:
     def __init__(self, word_number: int, term_type: TermType | None, word: str):
         self.converted = False
+        self.operand = None
         self.word_number = word_number
         self.term_type = term_type
         self.word = word
