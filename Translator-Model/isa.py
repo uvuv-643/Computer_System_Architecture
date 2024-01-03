@@ -3,39 +3,39 @@ from enum import Enum
 
 
 class Opcode(str, Enum):
-    DROP = 'drop'
-    MUL = 'mul'
-    DIV = 'div'
-    SUB = 'sub'
-    ADD = 'add'
-    MOD = 'mod'
-    SWAP = 'swap'
-    OVER = 'over'
-    DUP = 'dup'
-    EQ = 'eq'
-    GR = 'gr'
-    LS = 'ls'
-    DI = 'di'
-    EI = 'ei'
-    OMIT = 'omit'
-    WRITE = 'write'
-    READ = 'read'
+    DROP = "drop"
+    MUL = "mul"
+    DIV = "div"
+    SUB = "sub"
+    ADD = "add"
+    MOD = "mod"
+    SWAP = "swap"
+    OVER = "over"
+    DUP = "dup"
+    EQ = "eq"
+    GR = "gr"
+    LS = "ls"
+    DI = "di"
+    EI = "ei"
+    OMIT = "omit"
+    WRITE = "write"
+    READ = "read"
 
     # not used in source code, compile-generated
-    STORE = 'store'
-    LOAD = 'load'
-    PUSH = 'push'
-    RDUP = 'rdup'
-    RPOP = 'rpop'
-    RPUSH = 'rpush'
-    RADD = 'radd'
-    RDROP = 'rdrop'
-    POP = 'pop'  # move from data stack to return stack
-    MOV = 'mov'  # move to data memory from data stack
-    JMP = 'jmp'
-    ZJMP = 'zjmp'
-    RET = 'ret'
-    HALT = 'halt'
+    STORE = "store"
+    LOAD = "load"
+    PUSH = "push"
+    RDUP = "rdup"
+    RPOP = "rpop"
+    RPUSH = "rpush"
+    RADD = "radd"
+    RDROP = "rdrop"
+    POP = "pop"  # move from data stack to return stack
+    MOV = "mov"  # move to data memory from data stack
+    JMP = "jmp"
+    ZJMP = "zjmp"
+    RET = "ret"
+    HALT = "halt"
 
     def __str__(self):
         return str(self.value)
@@ -43,21 +43,45 @@ class Opcode(str, Enum):
 
 class TermType(Enum):
     (
-
         # Term --> Opcode
-        DI, EI, DUP, ADD, SUB, MUL, DIV, MOD, OMIT, SWAP, DROP,
-        OVER, EQ, LS, GR, WRITE, READ,
-
+        DI,
+        EI,
+        DUP,
+        ADD,
+        SUB,
+        MUL,
+        DIV,
+        MOD,
+        OMIT,
+        SWAP,
+        DROP,
+        OVER,
+        EQ,
+        LS,
+        GR,
+        WRITE,
+        READ,
         # Term !-> Opcode
-        VARIABLE, ALLOT, STORE, LOAD, IF,
-        ELSE, THEN, PRINT, DEF, RET, DEF_INTR,
-        DO, LOOP, BEGIN, UNTIL, LOOP_CNT
-
+        VARIABLE,
+        ALLOT,
+        STORE,
+        LOAD,
+        IF,
+        ELSE,
+        THEN,
+        PRINT,
+        DEF,
+        RET,
+        DEF_INTR,
+        DO,
+        LOOP,
+        BEGIN,
+        UNTIL,
+        LOOP_CNT,
     ) = range(100)
 
 
 class Term:
-
     def __init__(self, word_number: int, term_type: TermType | None, word: str):
         self.converted = False
         self.word_number = word_number
