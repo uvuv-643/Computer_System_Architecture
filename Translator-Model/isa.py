@@ -80,7 +80,7 @@ class TermType(Enum):
         BEGIN,
         UNTIL,
         LOOP_CNT,
-    ) = range(100)
+    ) = range(33)
 
 
 class Term:
