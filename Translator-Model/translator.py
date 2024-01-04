@@ -3,10 +3,12 @@ from __future__ import annotations
 import shlex
 import sys
 
-from isa import Term, TermType, write_code
+from isa import Opcode, OpcodeType, Term, TermType, write_code
 
 variables = {}
 variable_current_address = 10
+functions = {}
+intr_function = None
 
 
 def word_to_term(word: str) -> Term | None:
@@ -69,10 +71,6 @@ def set_closed_indexes(terms: list[Term], begin: TermType, end: TermType, error_
     assert len(nested) == 0, error_message
 
 
-functions = {}
-intr_function = None
-
-
 def set_functions(terms: list[Term]) -> None:
     global functions, intr_function
     func_indexes = []
@@ -113,7 +111,7 @@ def set_variables(terms: list[Term]) -> None:
             variables[terms[term_index + 1].word] = variable_current_address
             variable_current_address += 1
             terms[term_index + 1].converted = True
-            if term_index + 3 < len(terms) and terms[term_index + 3] is TermType.ALLOT:
+            if term_index + 3 < len(terms) and terms[term_index + 3].term_type is TermType.ALLOT:
                 set_allot_for_variable(terms, term_index + 3)
 
 
@@ -176,12 +174,78 @@ def validate_and_fix_terms(terms: list[Term]):
     set_if_else_then(terms)
 
 
+def term_to_opcode(term: Term) -> Opcode:
+    opcode = {
+        TermType.DI: [Opcode(OpcodeType.DI, [])],
+        TermType.EI: [Opcode(OpcodeType.EI, [])],
+        TermType.DUP: [Opcode(OpcodeType.DUP, [])],
+        TermType.ADD: [Opcode(OpcodeType.ADD, [])],
+        TermType.SUB: [Opcode(OpcodeType.SUB, [])],
+        TermType.MUL: [Opcode(OpcodeType.MUL, [])],
+        TermType.DIV: [Opcode(OpcodeType.DIV, [])],
+        TermType.MOD: [Opcode(OpcodeType.MOD, [])],
+        TermType.OMIT: [Opcode(OpcodeType.OMIT, [])],
+        TermType.SWAP: [Opcode(OpcodeType.SWAP, [])],
+        TermType.DROP: [Opcode(OpcodeType.DROP, [])],
+        TermType.OVER: [Opcode(OpcodeType.OVER, [])],
+        TermType.EQ: [Opcode(OpcodeType.EQ, [])],
+        TermType.LS: [Opcode(OpcodeType.LS, [])],
+        TermType.GR: [Opcode(OpcodeType.GR, [])],
+        TermType.READ: [Opcode(OpcodeType.READ, [])],
+        TermType.VARIABLE: [],
+        TermType.ALLOT: [],
+        TermType.STORE: [Opcode(OpcodeType.STORE, [])],
+        TermType.LOAD: [Opcode(OpcodeType.LOAD, [])],
+        TermType.IF: [Opcode(OpcodeType.ZJMP, [])],
+        TermType.ELSE: [Opcode(OpcodeType.JMP, [])],
+        TermType.THEN: [],
+        TermType.PRINT: [Opcode(OpcodeType.WRITE, [])],
+        TermType.DEF: [],
+        TermType.RET: [Opcode(OpcodeType.RET, [])],
+        TermType.DEF_INTR: [],
+        TermType.DO: [
+            Opcode(OpcodeType.POP, []),  # R(i)
+            Opcode(OpcodeType.POP, []),  # R(i, n)
+        ],
+        TermType.LOOP: [
+            Opcode(OpcodeType.RPOP, []),  # (n)
+            Opcode(OpcodeType.RPOP, []),  # (n, i)
+            Opcode(OpcodeType.PUSH, [1]),  # (n, i, 1)
+            Opcode(OpcodeType.ADD, []),  # (n, i + 1)
+            Opcode(OpcodeType.OVER, []),  # (n, i + 1, n)
+            Opcode(OpcodeType.OVER, []),  # (n, i + 1, n, i + 1)
+            Opcode(OpcodeType.GR, []),  # (n, i + 1, n > i + 1 [i + 1 < n])
+            Opcode(OpcodeType.ZJMP, []),  # (n, i + 1)
+            Opcode(OpcodeType.DROP, []),  # (n)
+            Opcode(OpcodeType.DROP, []),  # ()
+        ],
+        TermType.BEGIN: [],
+        TermType.UNTIL: [Opcode(OpcodeType.ZJMP, [])],
+        TermType.LOOP_CNT: [
+            Opcode(OpcodeType.RPOP, []),
+            Opcode(OpcodeType.DUP, []),
+            Opcode(OpcodeType.RPOP, []),
+        ],
+        TermType.CALL: [Opcode(OpcodeType.CALL, [])],
+    }.get(term.term_type)
+
+    if term.operand:
+        opcode.params.append(term.operand)
+
+    return opcode
+
+
+def terms_to_opcodes(terms: list[Term]) -> list[Opcode]:
+    return list(map(term_to_opcode, terms))
+
+
 def translate(source_code: str) -> str:
     terms = split_to_terms(source_code)
     validate_and_fix_terms(terms)
+    opcodes = terms_to_opcodes(terms)
     for i in list(map(lambda x: str(x.word_number) + ": " + x.word + " --> " + str(x.operand), terms)):
         print(i)
-
+    print(variables, functions)
     return "lol..."
 
 

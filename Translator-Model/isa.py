@@ -4,7 +4,7 @@ import json
 from enum import Enum
 
 
-class Opcode(str, Enum):
+class OpcodeType(str, Enum):
     DROP = "drop"
     MUL = "mul"
     DIV = "div"
@@ -27,20 +27,23 @@ class Opcode(str, Enum):
     STORE = "store"
     LOAD = "load"
     PUSH = "push"
-    RDUP = "rdup"
-    RPOP = "rpop"
-    RPUSH = "rpush"
-    RADD = "radd"
-    RDROP = "rdrop"
+    RPOP = "rpop"  # move from return stack to data stack
     POP = "pop"  # move from data stack to return stack
     MOV = "mov"  # move to data memory from data stack
     JMP = "jmp"
     ZJMP = "zjmp"
+    CALL = "call"
     RET = "ret"
     HALT = "halt"
 
     def __str__(self):
         return str(self.value)
+
+
+class Opcode:
+    def __init__(self, opcode_type: OpcodeType, params: list[any]):
+        self.opcode_type = opcode_type
+        self.params = params
 
 
 class TermType(Enum):
@@ -61,7 +64,6 @@ class TermType(Enum):
         EQ,
         LS,
         GR,
-        WRITE,
         READ,
         # Term !-> Opcode
         VARIABLE,
@@ -82,7 +84,7 @@ class TermType(Enum):
         LOOP_CNT,
         CALL,
         STRING,
-    ) = range(35)
+    ) = range(34)
 
 
 class Term:
@@ -106,7 +108,7 @@ def read_code(filename):
     with open(filename, encoding="utf-8") as file:
         code = json.loads(file.read())
     for instr in code:
-        instr["opcode"] = Opcode(instr["opcode"])
+        instr["opcode"] = OpcodeType(instr["opcode"])
         if "term" in instr:
             assert len(instr["term"]) == 3
             instr["term"] = Term(instr["term"][0], instr["term"][1], instr["term"][2])

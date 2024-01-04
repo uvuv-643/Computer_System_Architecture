@@ -1,6 +1,6 @@
 variable stop_input
-variable str_len
 variable str_buff 40 allot
+variable str_len
 
 0 str_len !
 0 stop_input !
