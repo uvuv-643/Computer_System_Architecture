@@ -4,6 +4,21 @@ import json
 from enum import Enum
 
 
+class OpcodeParamType(str, Enum):
+    CONST = "const"
+    ADDR = "addr"
+    UNDEFINED = "undefined"
+
+
+class OpcodeParam:
+    def __init__(self, param_type: OpcodeParamType, value: any):
+        self.param_type = param_type
+        self.value = value
+
+    def __str__(self):
+        return f"({self.param_type}, {self.value})"
+
+
 class OpcodeType(str, Enum):
     DROP = "drop"
     MUL = "mul"
@@ -41,7 +56,7 @@ class OpcodeType(str, Enum):
 
 
 class Opcode:
-    def __init__(self, opcode_type: OpcodeType, params: list[any]):
+    def __init__(self, opcode_type: OpcodeType, params: list[OpcodeParam]):
         self.opcode_type = opcode_type
         self.params = params
 
