@@ -3,13 +3,22 @@ from __future__ import annotations
 import shlex
 import sys
 
-from isa import Opcode, OpcodeParam, OpcodeParamType, OpcodeType, Term, TermType, write_code
+from isa import Opcode, OpcodeParam, OpcodeParamType, OpcodeType, TermType, write_code
+
+
+class Term:
+    def __init__(self, word_number: int, term_type: TermType | None, word: str):
+        self.converted = False
+        self.operand = None
+        self.word_number = word_number
+        self.term_type = term_type
+        self.word = word
+
 
 variables = {}
 variable_current_address = 512
 string_current_address = 0
 functions = {}
-intr_function = None
 
 
 def word_to_term(word: str) -> Term | None:
@@ -74,7 +83,7 @@ def set_closed_indexes(terms: list[Term], begin: TermType, end: TermType, error_
 
 
 def set_functions(terms: list[Term]) -> None:
-    global functions, intr_function
+    global functions
     func_indexes = []
     for term_index, term in enumerate(terms):
         if term.term_type is TermType.DEF or term.term_type is TermType.DEF_INTR:
@@ -85,16 +94,10 @@ def set_functions(terms: list[Term]) -> None:
             func_name = terms[term_index + 1].word
             functions[func_name] = term.word_number + 1
             terms[term_index + 1].converted = True
-            if term.term_type is TermType.DEF_INTR:
-                intr_function = func_name
         if term.term_type == TermType.RET:
             assert len(func_indexes) >= 1, "RET out of function at word #" + str(term.word_number)
             terms[func_indexes.pop()].operand = term.word_number + 1
     assert len(func_indexes) == 0, "Unclosed function"
-
-
-def assert_with_line(cond: bool, msg: str, word_index: int) -> None:
-    assert cond, msg + ". word: " + str(word_index)
 
 
 def set_variables(terms: list[Term]) -> None:
@@ -167,7 +170,7 @@ def replace_vars_funcs(terms: list[Term]) -> None:
                 term.word = "call"
 
 
-def validate_and_fix_terms(terms: list[Term]):
+def validate_and_fix_terms(terms: list[Term]) -> None:
     set_closed_indexes(terms, TermType.DO, TermType.LOOP, "Unbalanced do ... loop")
     set_closed_indexes(terms, TermType.BEGIN, TermType.UNTIL, "Unbalanced begin ... until")
     set_functions(terms)
@@ -187,12 +190,13 @@ def fix_literal_term(term: Term) -> list[Opcode]:
         content = term.word[2:-1]  # ." <content>"
         string_start = string_current_address
 
+        opcodes.append(Opcode(OpcodeType.POP, []))  # output port to return stack
         opcodes.append(Opcode(OpcodeType.PUSH, [OpcodeParam(OpcodeParamType.CONST, len(content))]))
         opcodes.append(Opcode(OpcodeType.PUSH, [OpcodeParam(OpcodeParamType.CONST, string_current_address)]))
         opcodes.append(Opcode(OpcodeType.STORE, []))
         string_current_address += 1
         for char in content:
-            opcodes.append(Opcode(OpcodeType.PUSH, [OpcodeParam(OpcodeParamType.CONST, ascii(char))]))
+            opcodes.append(Opcode(OpcodeType.PUSH, [OpcodeParam(OpcodeParamType.CONST, ord(char))]))
             opcodes.append(Opcode(OpcodeType.PUSH, [OpcodeParam(OpcodeParamType.CONST, string_current_address)]))
             opcodes.append(Opcode(OpcodeType.STORE, []))
             string_current_address += 1
@@ -205,6 +209,9 @@ def fix_literal_term(term: Term) -> list[Opcode]:
         opcodes.append(Opcode(OpcodeType.OVER, []))
         opcodes.append(Opcode(OpcodeType.ZJMP, [OpcodeParam(OpcodeParamType.ADDR_REL, 6)]))
         opcodes.append(Opcode(OpcodeType.LOAD, []))
+        opcodes.append(Opcode(OpcodeType.RPOP, []))  # output port
+        opcodes.append(Opcode(OpcodeType.DUP, []))  # output port
+        opcodes.append(Opcode(OpcodeType.POP, []))  # output port
         opcodes.append(Opcode(OpcodeType.OMIT, []))
         opcodes.append(Opcode(OpcodeType.PUSH, [OpcodeParam(OpcodeParamType.CONST, 1)]))
         opcodes.append(Opcode(OpcodeType.SUB, []))
@@ -302,43 +309,58 @@ def fix_addresses_in_opcodes(term_opcodes: list[list[Opcode]]) -> list[Opcode]:
     return result_opcodes
 
 
-def terms_to_opcodes(terms: list[Term]) -> list[Opcode]:
+def fix_interrupt_function(terms: list[Term]) -> (list[Term], dict):
     is_interrupt = False
-    interrupt_ret = 0
+    interrupt_ret = 1
+    moved_terms = {}
     terms_interrupt_proc = []
     terms_not_interrupt_proc = []
-    for term in terms:
+    for term in terms[1:]:
         if term.term_type is TermType.DEF_INTR:
             is_interrupt = True
         if term.term_type is TermType.RET:
             if is_interrupt:
                 terms_interrupt_proc.append(term)
-                interrupt_ret = len(terms_interrupt_proc)
+                interrupt_ret = len(terms_interrupt_proc) + 1
             else:
                 terms_not_interrupt_proc.append(term)
             is_interrupt = False
+
         if is_interrupt:
             terms_interrupt_proc.append(term)
+            moved_terms[term.word_number] = len(terms_interrupt_proc)
         elif not is_interrupt and term.term_type is not TermType.RET:
             terms_not_interrupt_proc.append(term)
+            moved_terms[term.word_number] = len(terms_not_interrupt_proc)
 
-    terms[0].operand = interrupt_ret + 1
-    terms = [terms_not_interrupt_proc[0]] + terms_interrupt_proc + terms_not_interrupt_proc[1:]
+    terms[0].operand = interrupt_ret
+    return [*[terms[0]], *terms_interrupt_proc, *terms_not_interrupt_proc], moved_terms
+
+
+def terms_to_opcodes(terms: list[Term]) -> list[Opcode]:
+    terms, moved_terms = fix_interrupt_function(terms)
+    for term in terms:
+        if term.operand and term.operand in moved_terms:
+            term.operand = moved_terms[term.operand]
     opcodes = list(map(term_to_opcodes, terms))
     opcodes = fix_addresses_in_opcodes(opcodes)
     return [*opcodes, Opcode(OpcodeType.HALT, [])]
 
 
-def translate(source_code: str) -> str:
+def translate(source_code: str) -> list[dict]:
     terms = split_to_terms(source_code)
     validate_and_fix_terms(terms)
     opcodes = terms_to_opcodes(terms)
+    commands = []
     for index, opcode in enumerate(opcodes):
+        command = {
+            "index": index,
+            "command": opcode.opcode_type,
+        }
         if len(opcode.params):
-            print(index, opcode.opcode_type, str(opcode.params[0]))
-        else:
-            print(index, opcode.opcode_type)
-    return "lol..."
+            command["arg"] = int(opcode.params[0].value)
+        commands.append(command)
+    return commands
 
 
 def main(source_file: str, target_file: str) -> None:

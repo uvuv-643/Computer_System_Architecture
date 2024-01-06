@@ -103,29 +103,9 @@ class TermType(Enum):
     ) = range(35)
 
 
-class Term:
-    def __init__(self, word_number: int, term_type: TermType | None, word: str):
-        self.converted = False
-        self.operand = None
-        self.word_number = word_number
-        self.term_type = term_type
-        self.word = word
-
-
-def write_code(filename, code):
+def write_code(filename: str, code: list[dict]):
     with open(filename, "w", encoding="utf-8") as file:
         buf = []
         for instr in code:
             buf.append(json.dumps(instr))
         file.write("[" + ",\n ".join(buf) + "]")
-
-
-def read_code(filename):
-    with open(filename, encoding="utf-8") as file:
-        code = json.loads(file.read())
-    for instr in code:
-        instr["opcode"] = OpcodeType(instr["opcode"])
-        if "term" in instr:
-            assert len(instr["term"]) == 3
-            instr["term"] = Term(instr["term"][0], instr["term"][1], instr["term"][2])
-    return code
