@@ -1,32 +1,53 @@
-0   MOV 0 12
-1   MOV 1 'h'
-2   MOV 2 'e'
-3   MOV 3 'l'
-4   MOV 4 'l'
-5   MOV 5 'o'
-6   MOV 6 ' '
-7   MOV 7 'w'
-8   MOV 8 'o'
-9   MOV 9 'r'
-10  MOV 10 'l'
-11  MOV 11 'd'
-12  MOV 12 '!'
-
-13  PUSH 0
-14  LOAD
-15  DUP
-16  ZJMP 29
-17  DUP
-18  PUSH 0
-19  LOAD
-20  SWAP
-21  SUB
-22  PUSH 1
-23  ADD
-24  LOAD
-25  PUSH 11
-26  OMIT
-27  PUSH 1
-28  SUB
-
-29  HALT
+0 jmp (const, 1)
+1 push (const, 12)
+2 push (const, 0)
+3 store
+4 push (const, 'h')
+5 push (const, 1)
+6 store
+7 push (const, 'e')
+8 push (const, 2)
+9 store
+10 push (const, 'l')
+11 push (const, 3)
+12 store
+13 push (const, 'l')
+14 push (const, 4)
+15 store
+16 push (const, 'o')
+17 push (const, 5)
+18 store
+19 push (const, ' ')
+20 push (const, 6)
+21 store
+22 push (const, 'w')
+23 push (const, 7)
+24 store
+25 push (const, 'o')
+26 push (const, 8)
+27 store
+28 push (const, 'r')
+29 push (const, 9)
+30 store
+31 push (const, 'l')
+32 push (const, 10)
+33 store
+34 push (const, 'd')
+35 push (const, 11)
+36 store
+37 push (const, '!')
+38 push (const, 12)
+39 store
+40 push (const, 0)
+41 load
+42 push (const, 0)
+43 push (const, 1)
+44 add
+45 over
+46 zjmp (const, 52)
+47 load
+48 omit
+49 push (const, 1)
+50 sub
+51 jmp (const, 43)
+52 halt

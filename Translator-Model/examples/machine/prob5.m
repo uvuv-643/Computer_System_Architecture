@@ -1,38 +1,49 @@
-0   DUP
-1   PUSH 0
-2   EQ
-3   JNE 10
-4   DROP
-5   JMP
-6   SWAP
-7   OVER
-8   MOD
-9   JMP 0
-10  PUSH 1
-11  PUSH 21
-12  PUSH 1
-13  POP
-14  POP
-15  DUP
-16  RDUP
-17  RPOP
-18  MUL
-19  SWAP
-20  DUP
-21  RDUP
-22  RPOP
-23  SWAP
-24  DROP
-25  DIV
-26  RPUSH 1
-27  RADD
-28  RDUP
-29  RDUP
-30  GRE
-31  RJE 15
-32  RDROP
-33  RDROP
-34  PUSH 11
-35  WRITE
-36  HALT
-
+0 jmp (const, 1)
+1 jmp (const, 13)
+2 dup
+3 push (const, 0)
+4 eq
+5 zjmp (const, 8)
+6 drop
+7 jmp (const, 12)
+8 swap
+9 over
+10 mod
+11 call (const, 2)
+12 ret
+13 push (const, 1)
+14 push (const, 21)
+15 push (const, 1)
+16 pop
+17 pop
+18 dup
+19 rpop
+20 dup
+21 rpop
+22 pop
+23 pop
+24 mul
+25 swap
+26 dup
+27 rpop
+28 dup
+29 rpop
+30 pop
+31 pop
+32 call (const, 2)
+33 swap
+34 drop
+35 div
+36 rpop
+37 rpop
+38 push (const, 1)
+39 add
+40 over
+41 over
+42 gr
+43 zjmp (const, 16)
+44 drop
+45 drop
+46 push (const, 11)
+47 write
+48 halt

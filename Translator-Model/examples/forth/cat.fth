@@ -9,10 +9,3 @@ variable stop_input
 ei ;
 
 begin stop_input @ until
-begin stop_input @ until
-begin stop_input @ until
-begin stop_input @ until
-begin stop_input @ until
-begin stop_input @ until
-begin stop_input @ until
-begin stop_input @ until

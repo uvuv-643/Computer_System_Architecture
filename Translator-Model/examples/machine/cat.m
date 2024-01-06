@@ -1,23 +1,22 @@
-0   PUSH 0
-1   PUSH 10
-2   STORE
-3   PUSH 10
-4   LOAD
-5   JNE 3
-6   HALT
-
-150  DI
-151  PUSH 10
-152  READ
-153  DUP
-154  PUSH 13
-155  EQ
-156  JNE 60
-157  PUSH 1
-158  PUSH 10
-159  STORE
-160  PUSH 11
-161  OMIT
-162  EI
-163  RET
-
+0 jmp (const, 15)
+1 di
+2 push (const, 10)
+3 read
+4 dup
+5 push (const, 13)
+6 eq
+7 zjmp (const, 15)
+8 push (const, 1)
+9 push (const, 512)
+10 store
+11 push (const, 11)
+12 omit
+13 ei
+14 ret
+15 push (const, 0)
+16 push (const, 512)
+17 store
+18 push (const, 512)
+19 load
+20 zjmp (const, 18)
+21 halt

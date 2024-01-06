@@ -8,6 +8,7 @@ class OpcodeParamType(str, Enum):
     CONST = "const"
     ADDR = "addr"
     UNDEFINED = "undefined"
+    ADDR_REL = "addr_rel"
 
 
 class OpcodeParam:
@@ -44,7 +45,6 @@ class OpcodeType(str, Enum):
     PUSH = "push"
     RPOP = "rpop"  # move from return stack to data stack
     POP = "pop"  # move from data stack to return stack
-    MOV = "mov"  # move to data memory from data stack
     JMP = "jmp"
     ZJMP = "zjmp"
     CALL = "call"
@@ -99,7 +99,8 @@ class TermType(Enum):
         LOOP_CNT,
         CALL,
         STRING,
-    ) = range(34)
+        ENTRYPOINT,
+    ) = range(35)
 
 
 class Term:

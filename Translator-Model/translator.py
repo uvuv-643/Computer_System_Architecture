@@ -6,7 +6,8 @@ import sys
 from isa import Opcode, OpcodeParam, OpcodeParamType, OpcodeType, Term, TermType, write_code
 
 variables = {}
-variable_current_address = 10
+variable_current_address = 512
+string_current_address = 0
 functions = {}
 intr_function = None
 
@@ -51,13 +52,13 @@ def word_to_term(word: str) -> Term | None:
 def split_to_terms(source_code: str) -> list[Term]:
     code_words = shlex.split(source_code.replace("\n", " "), posix=True)
     code_words = list(filter(lambda x: len(x) > 0, code_words))
-    terms = []
+    terms = [Term(0, TermType.ENTRYPOINT, "")]
     for word_number, word in enumerate(code_words):
         term_type = word_to_term(word)
         if word[:2] == ". ":
             word = f'."{word[2:]}"'
             term_type = TermType.STRING
-        terms.append(Term(word_number, term_type, word))
+        terms.append(Term(word_number + 1, term_type, word))
     return terms
 
 
@@ -65,7 +66,7 @@ def set_closed_indexes(terms: list[Term], begin: TermType, end: TermType, error_
     nested = []
     for term_index, term in enumerate(terms):
         if term.term_type is begin:
-            nested.append(term_index)
+            nested.append(term.word_number)
         if term.term_type == end:
             assert len(nested) > 0, error_message + " at word #" + str(term.word_number)
             term.operand = nested.pop()
@@ -80,15 +81,15 @@ def set_functions(terms: list[Term]) -> None:
             assert term_index + 1 < len(terms), "Missed function name" + str(term.word_number)
             assert len(func_indexes) == 0, "Unclosed function at word #" + str(term.word_number)
             assert term.word not in functions, "Duplicate function at word #" + str(term.word_number)
-            func_indexes.append(term_index)
+            func_indexes.append(term.word_number)
             func_name = terms[term_index + 1].word
-            functions[func_name] = term.word_number + 2
+            functions[func_name] = term.word_number + 1
             terms[term_index + 1].converted = True
             if term.term_type is TermType.DEF_INTR:
                 intr_function = func_name
         if term.term_type == TermType.RET:
             assert len(func_indexes) >= 1, "RET out of function at word #" + str(term.word_number)
-            term.operand = func_indexes.pop()
+            terms[func_indexes.pop()].operand = term.word_number + 1
     assert len(func_indexes) == 0, "Unclosed function"
 
 
@@ -175,6 +176,43 @@ def validate_and_fix_terms(terms: list[Term]):
     set_if_else_then(terms)
 
 
+def fix_literal_term(term: Term) -> list[Opcode]:
+    global string_current_address
+    if term.converted:
+        opcodes = []
+    elif term.term_type is not TermType.STRING:
+        opcodes = [Opcode(OpcodeType.PUSH, [OpcodeParam(OpcodeParamType.CONST, term.word)])]
+    else:
+        opcodes = []
+        content = term.word[2:-1]  # ." <content>"
+        string_start = string_current_address
+
+        opcodes.append(Opcode(OpcodeType.PUSH, [OpcodeParam(OpcodeParamType.CONST, len(content))]))
+        opcodes.append(Opcode(OpcodeType.PUSH, [OpcodeParam(OpcodeParamType.CONST, string_current_address)]))
+        opcodes.append(Opcode(OpcodeType.STORE, []))
+        string_current_address += 1
+        for char in content:
+            opcodes.append(Opcode(OpcodeType.PUSH, [OpcodeParam(OpcodeParamType.CONST, ascii(char))]))
+            opcodes.append(Opcode(OpcodeType.PUSH, [OpcodeParam(OpcodeParamType.CONST, string_current_address)]))
+            opcodes.append(Opcode(OpcodeType.STORE, []))
+            string_current_address += 1
+
+        opcodes.append(Opcode(OpcodeType.PUSH, [OpcodeParam(OpcodeParamType.CONST, string_start)]))
+        opcodes.append(Opcode(OpcodeType.LOAD, []))
+        opcodes.append(Opcode(OpcodeType.PUSH, [OpcodeParam(OpcodeParamType.CONST, string_start)]))
+        opcodes.append(Opcode(OpcodeType.PUSH, [OpcodeParam(OpcodeParamType.CONST, 1)]))
+        opcodes.append(Opcode(OpcodeType.ADD, []))
+        opcodes.append(Opcode(OpcodeType.OVER, []))
+        opcodes.append(Opcode(OpcodeType.ZJMP, [OpcodeParam(OpcodeParamType.ADDR_REL, 6)]))
+        opcodes.append(Opcode(OpcodeType.LOAD, []))
+        opcodes.append(Opcode(OpcodeType.OMIT, []))
+        opcodes.append(Opcode(OpcodeType.PUSH, [OpcodeParam(OpcodeParamType.CONST, 1)]))
+        opcodes.append(Opcode(OpcodeType.SUB, []))
+        opcodes.append(Opcode(OpcodeType.JMP, [OpcodeParam(OpcodeParamType.ADDR_REL, -8)]))
+
+    return opcodes
+
+
 def term_to_opcodes(term: Term) -> list[Opcode]:
     opcodes = {
         TermType.DI: [Opcode(OpcodeType.DI, [])],
@@ -201,7 +239,7 @@ def term_to_opcodes(term: Term) -> list[Opcode]:
         TermType.ELSE: [Opcode(OpcodeType.JMP, [OpcodeParam(OpcodeParamType.UNDEFINED, None)])],
         TermType.THEN: [],
         TermType.PRINT: [Opcode(OpcodeType.WRITE, [])],
-        TermType.DEF: [],
+        TermType.DEF: [Opcode(OpcodeType.JMP, [OpcodeParam(OpcodeParamType.UNDEFINED, None)])],
         TermType.RET: [Opcode(OpcodeType.RET, [])],
         TermType.DEF_INTR: [],
         TermType.DO: [
@@ -230,23 +268,18 @@ def term_to_opcodes(term: Term) -> list[Opcode]:
             Opcode(OpcodeType.POP, []),
         ],
         TermType.CALL: [Opcode(OpcodeType.CALL, [OpcodeParam(OpcodeParamType.UNDEFINED, None)])],
+        TermType.ENTRYPOINT: [Opcode(OpcodeType.JMP, [OpcodeParam(OpcodeParamType.UNDEFINED, None)])],
     }.get(term.term_type)
 
-    if opcodes is None:
-        if term.converted:
-            opcodes = []
-        elif term.term_type is not TermType.STRING:
-            opcodes = [Opcode(OpcodeType.PUSH, [OpcodeParam(OpcodeParamType.CONST, term.word)])]
-        else:
-            print(term.term_type, term.word)
-
-    if term.operand:
+    if term.operand and opcodes is not None:
         for opcode in opcodes:
             for param_num, param in enumerate(opcode.params):
                 if param.param_type is OpcodeParamType.UNDEFINED:
                     opcode.params[param_num].param_type = OpcodeParamType.ADDR
                     opcode.params[param_num].value = term.operand
 
+    if opcodes is None:
+        return fix_literal_term(term)
     return opcodes
 
 
@@ -254,29 +287,51 @@ def fix_addresses_in_opcodes(term_opcodes: list[list[Opcode]]) -> list[Opcode]:
     result_opcodes = []
     pref_sum = [0]
     for term_num, opcodes in enumerate(term_opcodes):
-        term_opcode_cnt = 1
-        if opcodes is not None:
-            term_opcode_cnt = len(opcodes)
+        term_opcode_cnt = len(opcodes)
         pref_sum.append(pref_sum[term_num] + term_opcode_cnt)
     for term_opcode in list(filter(lambda x: x is not None, term_opcodes)):
         for opcode in term_opcode:
             for param_num, param in enumerate(opcode.params):
                 if param.param_type is OpcodeParamType.ADDR:
                     opcode.params[param_num].value = pref_sum[param.value]
+                    opcode.params[param_num].param_type = OpcodeParamType.CONST
+                if param.param_type is OpcodeParamType.ADDR_REL:
+                    opcode.params[param_num].value = len(result_opcodes) + opcode.params[param_num].value
+                    opcode.params[param_num].param_type = OpcodeParamType.CONST
             result_opcodes.append(opcode)
     return result_opcodes
 
 
 def terms_to_opcodes(terms: list[Term]) -> list[Opcode]:
+    is_interrupt = False
+    interrupt_ret = 0
+    terms_interrupt_proc = []
+    terms_not_interrupt_proc = []
+    for term in terms:
+        if term.term_type is TermType.DEF_INTR:
+            is_interrupt = True
+        if term.term_type is TermType.RET:
+            if is_interrupt:
+                terms_interrupt_proc.append(term)
+                interrupt_ret = len(terms_interrupt_proc)
+            else:
+                terms_not_interrupt_proc.append(term)
+            is_interrupt = False
+        if is_interrupt:
+            terms_interrupt_proc.append(term)
+        elif not is_interrupt and term.term_type is not TermType.RET:
+            terms_not_interrupt_proc.append(term)
+
+    terms[0].operand = interrupt_ret + 1
+    terms = [terms_not_interrupt_proc[0]] + terms_interrupt_proc + terms_not_interrupt_proc[1:]
     opcodes = list(map(term_to_opcodes, terms))
-    return fix_addresses_in_opcodes(opcodes)
+    opcodes = fix_addresses_in_opcodes(opcodes)
+    return [*opcodes, Opcode(OpcodeType.HALT, [])]
 
 
 def translate(source_code: str) -> str:
     terms = split_to_terms(source_code)
     validate_and_fix_terms(terms)
-    # todo: fix strings
-    # todo: interrupts
     opcodes = terms_to_opcodes(terms)
     for index, opcode in enumerate(opcodes):
         if len(opcode.params):
