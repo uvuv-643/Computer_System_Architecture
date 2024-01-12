@@ -21,23 +21,22 @@ class OpcodeParam:
 
 
 class OpcodeType(str, Enum):
-    DROP = "drop"
+    DROP = "drop"  # 1
     MUL = "mul"
     DIV = "div"
     SUB = "sub"
     ADD = "add"
     MOD = "mod"
-    SWAP = "swap"
+    SWAP = "swap"  # ?
     OVER = "over"
-    DUP = "dup"
+    DUP = "dup"  # 1
     EQ = "eq"
     GR = "gr"
     LS = "ls"
-    DI = "di"
-    EI = "ei"
-    OMIT = "omit"
-    WRITE = "write"
-    READ = "read"
+    DI = "di"  # 0
+    EI = "ei"  # 0
+    OMIT = "omit"  # 1
+    READ = "read"  # 0 -> 1
 
     # not used in source code, compile-generated
     STORE = "store"
