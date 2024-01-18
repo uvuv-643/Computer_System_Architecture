@@ -171,6 +171,7 @@ def replace_vars_funcs(terms: list[Term]) -> None:
 
 
 def validate_and_fix_terms(terms: list[Term]) -> None:
+    # todo: fix do if loop then in compile time
     set_closed_indexes(terms, TermType.DO, TermType.LOOP, "Unbalanced do ... loop")
     set_closed_indexes(terms, TermType.BEGIN, TermType.UNTIL, "Unbalanced begin ... until")
     set_functions(terms)
@@ -245,7 +246,6 @@ def term_to_opcodes(term: Term) -> list[Opcode]:
         TermType.IF: [Opcode(OpcodeType.ZJMP, [OpcodeParam(OpcodeParamType.UNDEFINED, None)])],
         TermType.ELSE: [Opcode(OpcodeType.JMP, [OpcodeParam(OpcodeParamType.UNDEFINED, None)])],
         TermType.THEN: [],
-        TermType.PRINT: [Opcode(OpcodeType.WRITE, [])],
         TermType.DEF: [Opcode(OpcodeType.JMP, [OpcodeParam(OpcodeParamType.UNDEFINED, None)])],
         TermType.RET: [Opcode(OpcodeType.RET, [])],
         TermType.DEF_INTR: [],
