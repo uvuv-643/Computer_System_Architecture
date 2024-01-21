@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import random
 import sys
 import typing
 from enum import Enum
@@ -39,6 +38,7 @@ class Selector(str, Enum):
     TOP_INPUT = "top_input"
     PC_INC = "pc_int"
     PC_RET = "pc_ret"
+    PC_IMMEDIATE = "pc_immediate"
 
     def __str__(self) -> str:
         return str(self.value)
@@ -102,17 +102,17 @@ class ALU:
         elif self.operation == ALUOpcode.MUL:
             self.result = self.src_a * self.src_b
         elif self.operation == ALUOpcode.DIV:
-            self.result = self.src_a // self.src_b
+            self.result = self.src_b // self.src_a
         elif self.operation == ALUOpcode.SUB:
-            self.result = self.src_a - self.src_b
+            self.result = self.src_b - self.src_a
         elif self.operation == ALUOpcode.MOD:
-            self.result = self.src_a % self.src_b
+            self.result = self.src_b % self.src_a
         elif self.operation == ALUOpcode.EQ:
-            self.result = self.src_a == self.src_b
+            self.result = int(self.src_a == self.src_b)
         elif self.operation == ALUOpcode.GR:
-            self.result = self.src_a > self.src_b
+            self.result = int(self.src_a < self.src_b)
         elif self.operation == ALUOpcode.LS:
-            self.result = self.src_a < self.src_b
+            self.result = int(self.src_a >= self.src_b)
         else:
             pytest.fail(f"Unknown ALU operation: {self.operation}")
 
@@ -147,14 +147,14 @@ class DataPath:
         self.memory_size = memory_size
         self.data_stack_size = data_stack_size
         self.return_stack_size = return_stack_size
-        self.memory = [0] * memory_size
-        self.data_stack = [0] * data_stack_size
-        self.return_stack = [0] * return_stack_size
+        self.memory = [4747] * memory_size
+        self.data_stack = [8877] * data_stack_size
+        self.return_stack = [9988] * return_stack_size
 
-        self.sp = 2
-        self.i = 0
+        self.sp = 4
+        self.i = 4
         self.pc = 0
-        self.top = self.next = self.temp = 0
+        self.top = self.next = self.temp = 8877
 
         self.alu = ALU()
 
@@ -217,10 +217,10 @@ class DataPath:
         elif selector is Selector.RET_STACK_OUT:
             self.return_stack[self.i] = self.temp
 
-    def signal_mem_wr(self) -> None:
+    def signal_mem_write(self) -> None:
         assert self.top >= 0, "Address below 0"
         assert self.top < self.memory_size, "Memory overflow"
-        self.next = self.memory[self.top]
+        self.memory[self.top] = self.next
 
     def signal_alu_operation(self, operation: ALUOpcode) -> None:
         self.alu.set_details(self.top, self.next, operation)
@@ -241,6 +241,9 @@ def opcode_to_alu_opcode(opcode_type: OpcodeType):
 
 
 class ControlUnit:
+
+    out_buffer = ""
+
     program_memory_size = None
     program_memory = None
     data_path = None
@@ -254,7 +257,6 @@ class ControlUnit:
     instruction_number = 0
 
     def __init__(self, data_path: DataPath, program_memory_size: int, input_tokens: list[tuple]):
-        random.seed(17)
         self.data_path = data_path
         self.input_tokens = input_tokens
         self.tokens_handled = [False for _ in input_tokens]
@@ -268,11 +270,13 @@ class ControlUnit:
             assert 0 <= mem_cell < self.program_memory_size, "Program index out of memory size"
             self.program_memory[mem_cell] = opcode
 
-    def signal_latch_pc(self, selector: Selector) -> None:
+    def signal_latch_pc(self, selector: Selector, immediate=0) -> None:
         if selector is Selector.PC_INC:
             self.data_path.pc += 1
         elif selector is Selector.PC_RET:
             self.data_path.pc = self.data_path.return_stack[self.data_path.i]
+        elif selector is Selector.PC_IMMEDIATE:
+            self.data_path.pc = immediate - 1
 
     def signal_latch_ps(self, intr_on: bool) -> None:
         self.ps["Intr_On"] = intr_on
@@ -282,15 +286,18 @@ class ControlUnit:
         # example input [(1, 'h'), (10, 'e'), (20, 'l'), (25, 'l'), (100, 'o')]
         if self.ps["Intr_On"]:
             for index, interrupt in enumerate(self.input_tokens):
-                if not self.tokens_handled[index] and interrupt[0] >= self.tick:
+                if not self.tokens_handled[index] and interrupt[0] <= self.tick_number:
                     self.IO = interrupt[1]
                     self.ps["Intr_Req"] = True
                     self.tokens_handled[index] = True
+                    print(interrupt, self.tick_number)
+                    self.tick([lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_PC)])
+                    self.tick([lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, 0)])
+                    break
         return False
 
     def tick(self, operations: list[typing.Callable], comment="") -> None:
         self.tick_number += 1
-        random.shuffle(operations)
         for operation in operations:
             operation()
         self.__print__(comment)
@@ -319,23 +326,129 @@ class ControlUnit:
                 ]
             )
             self.tick([lambda: self.data_path.signal_latch_top(Selector.TOP_IMMEDIATE, memory_cell["arg"])])
+        elif command == OpcodeType.DROP:
+            self.tick([
+                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
+                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
+            ])
+            self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
+        elif command == OpcodeType.OMIT:
+            self.out_buffer += chr(self.data_path.next)
+            self.tick([
+                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
+                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
+            ])
+            self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
+            self.tick([
+                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
+                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
+            ])
+            self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
+        elif command == OpcodeType.SWAP:
+            self.tick([lambda: self.data_path.signal_latch_temp(Selector.TEMP_TOP)])
+            self.tick([lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT)])
+            self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_TEMP)])
+        elif command == OpcodeType.OVER:
+            self.tick([lambda: self.data_path.signal_data_wr()])
+            self.tick([
+                lambda: self.data_path.signal_latch_temp(Selector.TEMP_TOP),
+                lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
+            ])
+            self.tick([lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT)])
+            self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_TEMP)])
+        elif command == OpcodeType.DUP:
+            self.tick([lambda: self.data_path.signal_data_wr()])
+            self.tick([
+                lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP),
+                lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
+            ])
+        elif command == OpcodeType.LOAD:
+            self.tick([lambda: self.data_path.signal_latch_top(Selector.TOP_MEM)])
+        elif command == OpcodeType.STORE:
+            self.tick([
+                lambda: self.data_path.signal_mem_write(),
+                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
+            ])
+            self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
+            self.tick([
+                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
+                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
+            ])
+            self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
+        elif command == OpcodeType.POP:
+            self.tick([lambda: self.data_path.signal_latch_temp(Selector.TEMP_TOP)])
+            self.tick([
+                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
+                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
+            ])
+            self.tick([
+                lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM),
+                lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_OUT)
+            ])
+            self.tick([lambda: self.data_path.signal_latch_i(Selector.I_INC)])
+        elif command == OpcodeType.RPOP:
+            self.tick([lambda: self.data_path.signal_latch_i(Selector.I_DEC)])
+            self.tick([
+                lambda: self.data_path.signal_latch_temp(Selector.TEMP_RETURN),
+                lambda: self.data_path.signal_data_wr()
+            ])
+            self.tick([
+                lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP),
+                lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
+            ])
+            self.tick([lambda: self.data_path.signal_latch_top(Selector.TOP_TEMP)])
+        elif command == OpcodeType.ZJMP:
+            if self.data_path.top == 0:
+                self.tick([
+                    lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, memory_cell["arg"]),
+                    lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
+                    lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
+                ])
+                self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
+            else:
+                self.tick([
+                    lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
+                    lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
+                ])
+                self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
+        elif command == OpcodeType.JMP:
+            self.tick([lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, memory_cell["arg"])])
+        elif command == OpcodeType.CALL:
+            self.tick([lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_PC)])
+            self.tick([
+                lambda: self.data_path.signal_latch_i(Selector.I_INC),
+                lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, memory_cell["arg"])
+            ])
+        elif command == OpcodeType.DI:
+            self.tick([lambda: self.signal_latch_ps(False)])
+        elif command == OpcodeType.EI:
+            self.tick([lambda: self.signal_latch_ps(True)])
+        elif command == OpcodeType.RET:
+            self.tick([lambda: self.data_path.signal_latch_i(Selector.I_DEC)])
+            self.tick([lambda: self.signal_latch_pc(Selector.PC_RET)])
+        elif command == OpcodeType.HALT:
+            print(self.out_buffer)
+            raise Exception
 
     def __print__(self, comment: str) -> None:
+        tos_memory = self.data_path.data_stack[self.data_path.sp - 1: self.data_path.sp - 4: -1]
+        tos = [self.data_path.top, self.data_path.next, *tos_memory]
+        ret_tos = self.data_path.return_stack[self.data_path.i - 1: self.data_path.i - 4: -1]
         state_repr = (
-            "TICK: {:4} | PS_REQ {:1} | PS_STATE: {:1} | SP: {:3} | I: {:3} | TOP: {:7} | NEXT : {:7} | TEMP: {:7} | "
-            "TOP_OF_DS : {:10} | RETURN_STACK[I] {:7} | DATA_MEMORY[TOP] {:7}"
+            "TICK: {:4} | PC: {:3} | PS_REQ {:1} | PS_STATE: {:1} | SP: {:3} | I: {:3} | "
+            "TEMP: {:7} | DATA_MEMORY[TOP] {:7} | TOS : {} | RETURN_TOS : {}"
         ).format(
             self.tick_number,
+            self.data_path.pc,
             self.ps["Intr_Req"],
             self.ps["Intr_On"],
             self.data_path.sp,
             self.data_path.i,
-            self.data_path.top,
-            self.data_path.next,
             self.data_path.temp,
-            str(self.data_path.data_stack[self.data_path.sp : self.data_path.sp - 3 : -1]),
-            self.data_path.return_stack[self.data_path.i],
-            self.data_path.memory[self.data_path.top],
+            self.data_path.memory[self.data_path.top] if self.data_path.top < self.data_path.memory_size else "?",
+            str(tos),
+            str(ret_tos),
+
         )
         logger.info(state_repr + " " + comment)
 
@@ -347,7 +460,8 @@ def simulation(code: list, limit: int, input_tokens: list[tuple]):
     while control_unit.instruction_number < limit:
         control_unit.command_cycle()
         print()
-    return ["", control_unit.instruction_number, control_unit.tick_number]
+        print(control_unit.program_memory[control_unit.data_path.pc])
+    return [control_unit.out_buffer, control_unit.instruction_number, control_unit.tick_number]
 
 
 def main(code_path: str, token_path: str | None) -> None:
@@ -359,7 +473,7 @@ def main(code_path: str, token_path: str | None) -> None:
     code = read_code(code_path)
     output, instr_num, ticks = simulation(
         code,
-        limit=10,
+        limit=600,
         input_tokens=input_tokens,
     )
     print(f"Output: {output}\nInstruction number: {instr_num}\nTicks: {ticks - 1}")

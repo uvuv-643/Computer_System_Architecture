@@ -5,11 +5,11 @@ variable str_len
 0 str_len !
 0 stop_input !
 
-." hello! enter your name: "
+11 ." hello! enter your name: "
 begin stop_input @ until
-." hello, "
+11 ." hello, "
 str_len @ 0 do str_buff i + @ 11 omit loop
-." !"
+11 ." !"
 
 :intr intr_enter di
     10 read

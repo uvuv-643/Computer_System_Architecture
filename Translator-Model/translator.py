@@ -46,7 +46,7 @@ def word_to_term(word: str) -> Term | None:
         "if": TermType.IF,
         "else": TermType.ELSE,
         "then": TermType.THEN,
-        ".": TermType.PRINT,
+        ".": TermType.OMIT,
         ":": TermType.DEF,
         ";": TermType.RET,
         ":intr": TermType.DEF_INTR,
@@ -208,15 +208,18 @@ def fix_literal_term(term: Term) -> list[Opcode]:
         opcodes.append(Opcode(OpcodeType.PUSH, [OpcodeParam(OpcodeParamType.CONST, 1)]))
         opcodes.append(Opcode(OpcodeType.ADD, []))
         opcodes.append(Opcode(OpcodeType.OVER, []))
-        opcodes.append(Opcode(OpcodeType.ZJMP, [OpcodeParam(OpcodeParamType.ADDR_REL, 6)]))
+        opcodes.append(Opcode(OpcodeType.ZJMP, [OpcodeParam(OpcodeParamType.ADDR_REL, 12)]))
+        opcodes.append(Opcode(OpcodeType.DUP, []))
         opcodes.append(Opcode(OpcodeType.LOAD, []))
         opcodes.append(Opcode(OpcodeType.RPOP, []))  # output port
         opcodes.append(Opcode(OpcodeType.DUP, []))  # output port
         opcodes.append(Opcode(OpcodeType.POP, []))  # output port
         opcodes.append(Opcode(OpcodeType.OMIT, []))
+        opcodes.append(Opcode(OpcodeType.SWAP, []))
         opcodes.append(Opcode(OpcodeType.PUSH, [OpcodeParam(OpcodeParamType.CONST, 1)]))
         opcodes.append(Opcode(OpcodeType.SUB, []))
-        opcodes.append(Opcode(OpcodeType.JMP, [OpcodeParam(OpcodeParamType.ADDR_REL, -8)]))
+        opcodes.append(Opcode(OpcodeType.SWAP, []))
+        opcodes.append(Opcode(OpcodeType.JMP, [OpcodeParam(OpcodeParamType.ADDR_REL, -14)]))
 
     return opcodes
 
@@ -263,7 +266,7 @@ def term_to_opcodes(term: Term) -> list[Opcode]:
             Opcode(OpcodeType.ADD, []),  # (n, i + 1)
             Opcode(OpcodeType.OVER, []),  # (n, i + 1, n)
             Opcode(OpcodeType.OVER, []),  # (n, i + 1, n, i + 1)
-            Opcode(OpcodeType.GR, []),  # (n, i + 1, n > i + 1 [i + 1 < n])
+            Opcode(OpcodeType.LS, []),  # (n, i + 1, n > i + 1 [i + 1 < n])
             Opcode(OpcodeType.ZJMP, [OpcodeParam(OpcodeParamType.UNDEFINED, None)]),  # (n, i + 1)
             Opcode(OpcodeType.DROP, []),  # (n)
             Opcode(OpcodeType.DROP, []),  # ()
@@ -274,10 +277,13 @@ def term_to_opcodes(term: Term) -> list[Opcode]:
         TermType.LOOP_CNT: [
             Opcode(OpcodeType.DI, []),
             Opcode(OpcodeType.RPOP, []),
-            Opcode(OpcodeType.DUP, []),
             Opcode(OpcodeType.RPOP, []),
+            Opcode(OpcodeType.OVER, []),
+            Opcode(OpcodeType.OVER, []),
             Opcode(OpcodeType.POP, []),
             Opcode(OpcodeType.POP, []),
+            Opcode(OpcodeType.SWAP, []),
+            Opcode(OpcodeType.DROP, []),
             Opcode(OpcodeType.EI, []),
         ],
         TermType.CALL: [Opcode(OpcodeType.CALL, [OpcodeParam(OpcodeParamType.UNDEFINED, None)])],
