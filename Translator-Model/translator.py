@@ -253,7 +253,7 @@ def term_to_opcodes(term: Term) -> list[Opcode]:
             Opcode(OpcodeType.DI, []),
             Opcode(OpcodeType.POP, []),  # R(i)
             Opcode(OpcodeType.POP, []),  # R(i, n)
-            Opcode(OpcodeType.EI, [])
+            Opcode(OpcodeType.EI, []),
         ],
         TermType.LOOP: [
             Opcode(OpcodeType.DI, []),
@@ -267,7 +267,7 @@ def term_to_opcodes(term: Term) -> list[Opcode]:
             Opcode(OpcodeType.ZJMP, [OpcodeParam(OpcodeParamType.UNDEFINED, None)]),  # (n, i + 1)
             Opcode(OpcodeType.DROP, []),  # (n)
             Opcode(OpcodeType.DROP, []),  # ()
-            Opcode(OpcodeType.EI, [])
+            Opcode(OpcodeType.EI, []),
         ],
         TermType.BEGIN: [],
         TermType.UNTIL: [Opcode(OpcodeType.ZJMP, [OpcodeParam(OpcodeParamType.UNDEFINED, None)])],
@@ -278,7 +278,7 @@ def term_to_opcodes(term: Term) -> list[Opcode]:
             Opcode(OpcodeType.RPOP, []),
             Opcode(OpcodeType.POP, []),
             Opcode(OpcodeType.POP, []),
-            Opcode(OpcodeType.EI, [])
+            Opcode(OpcodeType.EI, []),
         ],
         TermType.CALL: [Opcode(OpcodeType.CALL, [OpcodeParam(OpcodeParamType.UNDEFINED, None)])],
         TermType.ENTRYPOINT: [Opcode(OpcodeType.JMP, [OpcodeParam(OpcodeParamType.UNDEFINED, None)])],

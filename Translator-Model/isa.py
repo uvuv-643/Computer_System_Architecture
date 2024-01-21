@@ -108,3 +108,8 @@ def write_code(filename: str, code: list[dict]):
         for instr in code:
             buf.append(json.dumps(instr))
         file.write("[" + ",\n ".join(buf) + "]")
+
+
+def read_code(source_path: str) -> list:
+    with open(source_path, encoding="utf-8") as file:
+        return json.loads(file.read())
