@@ -289,10 +289,14 @@ class ControlUnit:
                 if not self.tokens_handled[index] and interrupt[0] <= self.tick_number:
                     self.IO = interrupt[1]
                     self.ps["Intr_Req"] = True
+                    self.ps["Intr_On"] = False
                     self.tokens_handled[index] = True
-                    print(interrupt, self.tick_number)
+                    print(interrupt, self.tick_number, self.data_path.pc)
                     self.tick([lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_PC)])
-                    self.tick([lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, 0)])
+                    self.tick([
+                        lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, 1),
+                        lambda: self.data_path.signal_latch_i(Selector.I_INC)
+                    ])
                     break
         return False
 
@@ -344,6 +348,19 @@ class ControlUnit:
                 lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
             ])
             self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
+        elif command == OpcodeType.READ:
+            self.tick([
+                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
+                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
+            ])
+            self.tick([lambda: self.data_path.signal_data_wr()])
+            self.tick(
+                [
+                    lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
+                    lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP),
+                ]
+            )
+            self.tick([lambda: self.data_path.signal_latch_top(Selector.TOP_IMMEDIATE, ord(self.IO))])
         elif command == OpcodeType.SWAP:
             self.tick([lambda: self.data_path.signal_latch_temp(Selector.TEMP_TOP)])
             self.tick([lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT)])
@@ -473,7 +490,7 @@ def main(code_path: str, token_path: str | None) -> None:
     code = read_code(code_path)
     output, instr_num, ticks = simulation(
         code,
-        limit=600,
+        limit=370,
         input_tokens=input_tokens,
     )
     print(f"Output: {output}\nInstruction number: {instr_num}\nTicks: {ticks - 1}")

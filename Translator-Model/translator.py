@@ -96,7 +96,8 @@ def set_functions(terms: list[Term]) -> None:
             terms[term_index + 1].converted = True
         if term.term_type == TermType.RET:
             assert len(func_indexes) >= 1, "RET out of function at word #" + str(term.word_number)
-            terms[func_indexes.pop()].operand = term.word_number + 1
+            function_term = terms[func_indexes.pop()]
+            function_term.operand = term.word_number + 1
     assert len(func_indexes) == 0, "Unclosed function"
 
 
@@ -171,7 +172,6 @@ def replace_vars_funcs(terms: list[Term]) -> None:
 
 
 def validate_and_fix_terms(terms: list[Term]) -> None:
-    # todo: fix do if loop then in compile time
     set_closed_indexes(terms, TermType.DO, TermType.LOOP, "Unbalanced do ... loop")
     set_closed_indexes(terms, TermType.BEGIN, TermType.UNTIL, "Unbalanced begin ... until")
     set_functions(terms)
@@ -299,6 +299,7 @@ def term_to_opcodes(term: Term) -> list[Opcode]:
 
     if opcodes is None:
         return fix_literal_term(term)
+
     return opcodes
 
 
@@ -308,6 +309,7 @@ def fix_addresses_in_opcodes(term_opcodes: list[list[Opcode]]) -> list[Opcode]:
     for term_num, opcodes in enumerate(term_opcodes):
         term_opcode_cnt = len(opcodes)
         pref_sum.append(pref_sum[term_num] + term_opcode_cnt)
+    print(pref_sum)
     for term_opcode in list(filter(lambda x: x is not None, term_opcodes)):
         for opcode in term_opcode:
             for param_num, param in enumerate(opcode.params):
@@ -321,10 +323,9 @@ def fix_addresses_in_opcodes(term_opcodes: list[list[Opcode]]) -> list[Opcode]:
     return result_opcodes
 
 
-def fix_interrupt_function(terms: list[Term]) -> (list[Term], dict):
+def fix_interrupt_function(terms: list[Term]) -> list[Term]:
     is_interrupt = False
     interrupt_ret = 1
-    moved_terms = {}
     terms_interrupt_proc = []
     terms_not_interrupt_proc = []
     for term in terms[1:]:
@@ -340,20 +341,15 @@ def fix_interrupt_function(terms: list[Term]) -> (list[Term], dict):
 
         if is_interrupt:
             terms_interrupt_proc.append(term)
-            moved_terms[term.word_number] = len(terms_interrupt_proc)
         elif not is_interrupt and term.term_type is not TermType.RET:
             terms_not_interrupt_proc.append(term)
-            moved_terms[term.word_number] = len(terms_not_interrupt_proc)
 
     terms[0].operand = interrupt_ret
-    return [*[terms[0]], *terms_interrupt_proc, *terms_not_interrupt_proc], moved_terms
+    return [*[terms[0]], *terms_interrupt_proc, *terms_not_interrupt_proc]
 
 
 def terms_to_opcodes(terms: list[Term]) -> list[Opcode]:
-    terms, moved_terms = fix_interrupt_function(terms)
-    for term in terms:
-        if term.operand and term.operand in moved_terms:
-            term.operand = moved_terms[term.operand]
+    terms = fix_interrupt_function(terms)
     opcodes = list(map(term_to_opcodes, terms))
     opcodes = fix_addresses_in_opcodes(opcodes)
     return [*opcodes, Opcode(OpcodeType.HALT, [])]
