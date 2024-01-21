@@ -306,29 +306,19 @@ class ControlUnit:
         command = memory_cell["command"]
         arithmetic_operation = opcode_to_alu_opcode(command)
         if arithmetic_operation is not None:
-            self.tick([
-                lambda: self.data_path.signal_alu_operation(arithmetic_operation)
-            ])
-            self.tick([
-                lambda: self.data_path.signal_latch_top(Selector.TOP_ALU)
-            ])
-            self.tick([
-                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
-            ])
-            self.tick([
-                lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)
-            ])
+            self.tick([lambda: self.data_path.signal_alu_operation(arithmetic_operation)])
+            self.tick([lambda: self.data_path.signal_latch_top(Selector.TOP_ALU)])
+            self.tick([lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)])
+            self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
         elif command == OpcodeType.PUSH:
-            self.tick([
-                lambda: self.data_path.signal_data_wr()
-            ])
-            self.tick([
-                lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
-                lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP)
-            ])
-            self.tick([
-                lambda: self.data_path.signal_latch_top(Selector.TOP_IMMEDIATE, memory_cell["arg"])
-            ])
+            self.tick([lambda: self.data_path.signal_data_wr()])
+            self.tick(
+                [
+                    lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
+                    lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP),
+                ]
+            )
+            self.tick([lambda: self.data_path.signal_latch_top(Selector.TOP_IMMEDIATE, memory_cell["arg"])])
 
     def __print__(self, comment: str) -> None:
         state_repr = (
@@ -343,7 +333,7 @@ class ControlUnit:
             self.data_path.top,
             self.data_path.next,
             self.data_path.temp,
-            str(self.data_path.data_stack[self.data_path.sp:self.data_path.sp - 3:-1]),
+            str(self.data_path.data_stack[self.data_path.sp : self.data_path.sp - 3 : -1]),
             self.data_path.return_stack[self.data_path.i],
             self.data_path.memory[self.data_path.top],
         )
