@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 import sys
+import threading
+import time
 import typing
 from enum import Enum
 
@@ -136,8 +138,10 @@ class DataPath:
     top = None
     next = None
     temp = None
+    sr: typing.ClassVar[list[int]] = None
 
-    alu = None
+    alu: typing.ClassVar[ALU] = None
+    latch_sr: bool = False
 
     def __init__(self, memory_size: int, data_stack_size: int, return_stack_size: int):
         assert memory_size > 0, "Data memory size must be greater than zero"
@@ -155,8 +159,12 @@ class DataPath:
         self.i = 4
         self.pc = 0
         self.top = self.next = self.temp = 8877
+        self.sr = [0 for _ in range(32)]
 
         self.alu = ALU()
+
+    def signal_latch_sr(self, signal: bool) -> None:
+        self.latch_sr = signal
 
     def signal_latch_sp(self, selector: Selector) -> None:
         if selector is Selector.SP_DEC:
@@ -241,7 +249,6 @@ def opcode_to_alu_opcode(opcode_type: OpcodeType):
 
 
 class ControlUnit:
-
     out_buffer = ""
 
     program_memory_size = None
@@ -261,8 +268,8 @@ class ControlUnit:
         self.input_tokens = input_tokens
         self.tokens_handled = [False for _ in input_tokens]
         self.program_memory_size = program_memory_size
-        self.program_memory = [{"index": x, "command": 0, "arg": 0} for x in range(self.program_memory_size)]
-        self.ps = {"Intr_Req": False, "Intr_On": True}
+        self.program_memory = [{"index": x, "command": "nop", "arg": 0} for x in range(self.program_memory_size)]
+        self.ps = {"Intr_Req": False, "Intr_On": True, "Intr_Mode": False}
 
     def fill_memory(self, opcodes: list) -> None:
         for opcode in opcodes:
@@ -278,44 +285,44 @@ class ControlUnit:
         elif selector is Selector.PC_IMMEDIATE:
             self.data_path.pc = immediate - 1
 
-    def signal_latch_ps(self, intr_on: bool) -> None:
-        self.ps["Intr_On"] = intr_on
-        self.ps["Intr_Req"] = self.check_for_interrupts()
+    def signal_latch_ps(self, state: bool):
+        self.ps["Intr_On"] = state
 
-    def check_for_interrupts(self) -> bool:
-        # example input [(1, 'h'), (10, 'e'), (20, 'l'), (25, 'l'), (100, 'o')]
-        if self.ps["Intr_On"]:
-            for index, interrupt in enumerate(self.input_tokens):
-                if not self.tokens_handled[index] and interrupt[0] <= self.tick_number:
-                    self.IO = interrupt[1]
-                    self.ps["Intr_Req"] = True
-                    self.ps["Intr_On"] = False
-                    self.tokens_handled[index] = True
-                    print(interrupt, self.tick_number, self.data_path.pc)
-                    self.tick([lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_PC)])
-                    self.tick([
-                        lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, 1),
-                        lambda: self.data_path.signal_latch_i(Selector.I_INC)
-                    ])
-                    break
-        return False
+    def check_for_interrupts(self) -> None:
+        if self.ps["Intr_Req"] and self.ps["Intr_On"]:
+            self.ps["Intr_On"] = False
+            self.ps["Intr_Req"] = False
+            self.tick([lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_PC)])
+            self.tick([
+                lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, 1),
+                lambda: self.data_path.signal_latch_i(Selector.I_INC)
+            ])
+            self.ps["Intr_Mode"] = True
+
+    def get_io_value(self) -> int:
+        sr = self.data_path.sr
+        io_value = 0
+        for i, bit in enumerate(sr):
+            io_value += pow(2, i) * bit
+        return io_value
 
     def tick(self, operations: list[typing.Callable], comment="") -> None:
         self.tick_number += 1
         for operation in operations:
             operation()
-        self.__print__(comment)
+        # self.__print__(comment)
 
     def command_cycle(self):
         self.instruction_number += 1
         self.decode_and_execute_instruction()
         self.check_for_interrupts()
         self.signal_latch_pc(Selector.PC_INC)
+        time.sleep(0.005)
 
     def decode_and_execute_instruction(self) -> None:
         memory_cell = self.program_memory[self.data_path.pc]
         command = memory_cell["command"]
-        arithmetic_operation = opcode_to_alu_opcode(command)
+        arithmetic_operation = opcode_to_alu_opcode(OpcodeType(command))
         if arithmetic_operation is not None:
             self.tick([lambda: self.data_path.signal_alu_operation(arithmetic_operation)])
             self.tick([lambda: self.data_path.signal_latch_top(Selector.TOP_ALU)])
@@ -337,11 +344,10 @@ class ControlUnit:
             ])
             self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
         elif command == OpcodeType.OMIT:
-            self.out_buffer += chr(self.data_path.next)
             self.tick([
-                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
-                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
+                lambda: self.data_path.signal_latch_sr(True),
             ])
+            print("LATCHED")
             self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
             self.tick([
                 lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
@@ -349,18 +355,7 @@ class ControlUnit:
             ])
             self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
         elif command == OpcodeType.READ:
-            self.tick([
-                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
-                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
-            ])
-            self.tick([lambda: self.data_path.signal_data_wr()])
-            self.tick(
-                [
-                    lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
-                    lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP),
-                ]
-            )
-            self.tick([lambda: self.data_path.signal_latch_top(Selector.TOP_IMMEDIATE, ord(self.IO))])
+            self.tick([lambda: self.data_path.signal_latch_top(Selector.TOP_IMMEDIATE, self.get_io_value())])
         elif command == OpcodeType.SWAP:
             self.tick([lambda: self.data_path.signal_latch_temp(Selector.TEMP_TOP)])
             self.tick([lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT)])
@@ -443,6 +438,7 @@ class ControlUnit:
         elif command == OpcodeType.RET:
             self.tick([lambda: self.data_path.signal_latch_i(Selector.I_DEC)])
             self.tick([lambda: self.signal_latch_pc(Selector.PC_RET)])
+            self.ps["Intr_Mode"] = False
         elif command == OpcodeType.HALT:
             print(self.out_buffer)
             raise Exception
@@ -470,14 +466,133 @@ class ControlUnit:
         logger.info(state_repr + " " + comment)
 
 
+class MasterSPI:
+
+    shift_register: typing.ClassVar[list[bool]] = None
+    MISO: typing.ClassVar[bool] = False
+    MOSI: typing.ClassVar[bool] = False
+    CS: typing.ClassVar[bool] = True
+    SCLK: typing.ClassVar[bool] = False
+    tick_number = None
+    tick_limit = None
+    intr_moving = False
+    sig_read = False
+
+    def __init__(self, control_unit: ControlUnit, limit: int):
+        self.shift_register = [0 for _ in range(32)]
+        self.control_unit = control_unit
+        self.tick_limit = limit
+        self.tick_number = 0
+
+    def tick_rise(self) -> None:
+        latch_sr = self.control_unit.data_path.latch_sr and self.CS
+        top_value = self.control_unit.data_path.top
+        sr = self.control_unit.data_path.sr
+        if latch_sr:  # slave
+            print("ABCDEF")
+            sr[0] = int(top_value) % 2
+            self.sig_read = True
+            self.CS = False
+            self.tick_number = 0
+        elif not self.CS and self.SCLK:  # slave + master
+            self.MOSI = self.shift_register[len(self.shift_register) - 1]
+            self.MISO = sr[len(sr) - 1]
+
+    def tick_fall(self) -> None:
+        latch_sr = self.control_unit.data_path.latch_sr and self.sig_read
+        top_value = self.control_unit.data_path.top
+        sr = self.control_unit.data_path.sr
+        if latch_sr and not self.intr_moving:  # slave
+            self.control_unit.data_path.latch_sr = False
+            print("ASDFGH")
+            self.intr_moving = True
+            for i in range(1, len(sr)):
+                sr[i] = int(top_value / pow(2, i)) % 2
+        if not self.CS and self.SCLK:  # master + slave
+            for i in reversed(range(len(self.shift_register) - 1)):
+                self.shift_register[i + 1] = self.shift_register[i]
+            for i in reversed(range(len(sr) - 1)):
+                sr[i + 1] = sr[i]
+            self.shift_register[0] = sr[len(sr) - 1]
+            sr[0] = self.shift_register[len(self.shift_register) - 1]
+        if not self.CS and self.tick_number >= 31:
+            self.CS = True
+            self.intr_moving = False
+            self.control_unit.ps["Intr_Req"] = True
+            self.write_content()
+            self.tick_number = 0
+            self.sig_read = False
+
+    def check_for_input(self) -> None:
+        # [(1, 'h'), (10, 'e'), (20, 'l'), (25, 'l'), (100, 'o')]
+        if self.control_unit.ps["Intr_On"] and not self.intr_moving and not self.control_unit.ps["Intr_Mode"]:
+            for index, interrupt in enumerate(self.control_unit.input_tokens):
+                if not self.control_unit.tokens_handled[index] and interrupt[0] <= self.control_unit.tick_number:
+                    input_content = ord(interrupt[1])
+                    for i in range(len(self.shift_register)):
+                        self.shift_register[i] = int(input_content / pow(2, i)) % 2
+                    self.control_unit.tokens_handled[index] = True
+                    self.CS = False
+                    self.tick_number = 0
+                    self.intr_moving = True
+                    return
+
+    def start(self):
+        global_tick = 0
+        while global_tick < self.tick_limit:
+            self.SCLK = True
+            self.tick_rise()
+            time.sleep(0.01)
+            self.tick_fall()
+            self.SCLK = False
+            time.sleep(0.01)
+            self.tick_number += 1
+            global_tick += 1
+            self.__print__()
+            self.check_for_input()
+
+    def __print__(self):
+        state_repr = (
+            "TICK: {:4} | PS_REQ {:1} | PS_STATE: {:1} | SCLK: {:1} | MISO: {:1} | MOSI: {:1} | CS: {:1} \nMASTER "
+            "SHIFT_REGISTER: {} \nSLAVE SHIFT_REGISTER: {}\n"
+        ).format(
+            self.tick_number,
+            self.control_unit.ps["Intr_Req"],
+            self.control_unit.ps["Intr_On"],
+            self.SCLK,
+            self.MISO,
+            self.MOSI,
+            self.CS,
+            str(self.shift_register),
+            str(self.control_unit.data_path.sr)
+        )
+        logger.info(state_repr)
+
+    def write_content(self):
+        # if self.sig_read:
+        io_value = 0
+        for i, bit in enumerate(self.shift_register):
+            io_value += pow(2, i) * bit
+        print("WRITE_CONTENT", (self.shift_register), io_value)
+        print()
+        print()
+        print()
+        print()
+        print()
+        print()
+
+
 def simulation(code: list, limit: int, input_tokens: list[tuple]):
     data_path = DataPath(15000, 15000, 15000)
     control_unit = ControlUnit(data_path, 15000, input_tokens)
     control_unit.fill_memory(code)
+    master_spi = MasterSPI(control_unit, 10000)
+    thread = threading.Thread(target=master_spi.start, daemon=True)
+    thread.start()
     while control_unit.instruction_number < limit:
         control_unit.command_cycle()
-        print()
-        print(control_unit.program_memory[control_unit.data_path.pc])
+        # print()
+        # print(control_unit.program_memory[control_unit.data_path.pc])
     return [control_unit.out_buffer, control_unit.instruction_number, control_unit.tick_number]
 
 
@@ -490,7 +605,7 @@ def main(code_path: str, token_path: str | None) -> None:
     code = read_code(code_path)
     output, instr_num, ticks = simulation(
         code,
-        limit=370,
+        limit=2000,
         input_tokens=input_tokens,
     )
     print(f"Output: {output}\nInstruction number: {instr_num}\nTicks: {ticks - 1}")

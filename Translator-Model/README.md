@@ -288,10 +288,13 @@ Stack Controller:
 ![TOS](figure/tos.png)
 
 DataPath:
-![DataPath](figure/datapath.png)
+![DataPath](figure/datapath.jpg)
 
 ControlUnit:
 ![ControlUnit](figure/controlunit.png)
+
+IO Controller:
+![SPI](figure/spi.jpg)
 
 [//]: # (todo: link to class)
 DataPath реализован в классе [machine.py:DataPath](machine.py#L132412341234123). 
