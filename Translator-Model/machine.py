@@ -5,7 +5,6 @@ import sys
 import typing
 from enum import Enum
 
-import pytest as pytest
 from isa import OpcodeType, read_code
 
 logger = logging.getLogger("machine_logger")
@@ -109,8 +108,6 @@ class ALU:
             self.result = int(self.src_a < self.src_b)
         elif self.operation == ALUOpcode.LS:
             self.result = int(self.src_a >= self.src_b)
-        else:
-            pytest.fail(f"Unknown ALU operation: {self.operation}")
 
     def set_details(self, src_a, src_b, operation: ALUOpcode) -> None:
         self.src_a = src_a
@@ -445,7 +442,6 @@ class ControlUnit:
             raise StopIteration
 
         instruction_ticks = self.get_instruction_ticks(memory_cell)
-        print(memory_cell, command, OpcodeType.HALT)
         for operations in instruction_ticks:
             self.tick(operations)
 
@@ -485,7 +481,6 @@ class MasterSPI:
         self.sig_read = False
         self.MISO = False
         self.MOSI = False
-        self.SCLK = False
 
     def tick_rise(self) -> None:
         sr = self.control_unit.data_path.sr
@@ -501,7 +496,7 @@ class MasterSPI:
             self.tick_number = 0
             self.control_unit.cs = False
             self.sig_read = True
-        elif not self.control_unit.cs and self.SCLK:  # master + slave
+        elif not self.control_unit.cs:  # master + slave
             for i in reversed(range(1, len(self.shift_register))):
                 self.shift_register[i] = self.shift_register[i - 1]
             for i in reversed(range(1, len(self.control_unit.data_path.sr))):
@@ -533,24 +528,21 @@ class MasterSPI:
                     return
 
     def tick(self):
-        self.SCLK = True
         self.tick_rise()
         self.tick_fall()
-        self.SCLK = False
         self.tick_number += 1
         self.__print__()
         self.check_for_input()
 
     def __print__(self):
         state_repr = (
-            "SPI  | TICK: {:4} | TICK_SPI: {:4} | PS_REQ {:1} | PS_STATE: {:1} | SCLK: {:1} | MISO: {:1} | MOSI: {:1} "
+            "SPI  | TICK: {:4} | TICK_SPI: {:4} | PS_REQ {:1} | PS_STATE: {:1} | MISO: {:1} | MOSI: {:1} "
             "| CS: {:1} | MSR: {:32} SSR: {:32}"
         ).format(
             self.control_unit.tick_number,
             self.tick_number,
             self.control_unit.ps["Intr_Req"],
             self.control_unit.ps["Intr_On"],
-            self.SCLK,
             self.MISO,
             self.MOSI,
             self.control_unit.cs,
