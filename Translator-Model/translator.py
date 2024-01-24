@@ -371,7 +371,6 @@ def translate(source_code: str) -> list[dict]:
 
 
 def main(source_file: str, target_file: str) -> None:
-
     global variables, variable_current_address, string_current_address, functions
 
     variables = {}

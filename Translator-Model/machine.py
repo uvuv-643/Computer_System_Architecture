@@ -268,15 +268,13 @@ class ControlUnit:
         if self.ps["Intr_Req"] and self.ps["Intr_On"]:
             self.ps["Intr_On"] = False
             self.ps["Intr_Req"] = False
-            self.tick([
-                [lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_PC), "RETURN_STACK = PC"]
-            ], "intr")
+            self.tick([[lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_PC), "RETURN_STACK = PC"]], "intr")
             self.tick(
                 [
                     [lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, 1), "PC = IMM"],
                     [lambda: self.data_path.signal_latch_i(Selector.I_INC), "I += 1"],
                 ],
-                "intr"
+                "intr",
             )
             self.ps["Intr_Mode"] = True
 
@@ -304,16 +302,12 @@ class ControlUnit:
         command = memory_cell["command"]
         arithmetic_operation = opcode_to_alu_opcode(OpcodeType(command))
         alu_operations = [
-            [
-                [lambda: self.data_path.signal_alu_operation(arithmetic_operation), "ALU: " + str(arithmetic_operation)]
-            ],
+            [[lambda: self.data_path.signal_alu_operation(arithmetic_operation), "ALU: " + str(arithmetic_operation)]],
             [
                 [lambda: self.data_path.signal_latch_top(Selector.TOP_ALU), "TOP = ALU"],
-                [lambda: self.data_path.signal_latch_sp(Selector.SP_DEC), "SP -= 1"]
+                [lambda: self.data_path.signal_latch_sp(Selector.SP_DEC), "SP -= 1"],
             ],
-            [
-                [lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM), "NEXT = MEM"]
-            ],
+            [[lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM), "NEXT = MEM"]],
         ]
         return {
             OpcodeType.ADD: alu_operations,
@@ -325,25 +319,19 @@ class ControlUnit:
             OpcodeType.EQ: alu_operations,
             OpcodeType.LS: alu_operations,
             OpcodeType.PUSH: [
-                [
-                    [lambda: self.data_path.signal_data_wr(), "MEM = NEXT"]
-                ],
+                [[lambda: self.data_path.signal_data_wr(), "MEM = NEXT"]],
                 [
                     [lambda: self.data_path.signal_latch_sp(Selector.SP_INC), "SP += 1"],
                     [lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP), "NEXT = TOP"],
                 ],
-                [
-                    [lambda: self.data_path.signal_latch_top(Selector.TOP_IMMEDIATE, memory_cell["arg"]), "TOP = IMM"]
-                ],
+                [[lambda: self.data_path.signal_latch_top(Selector.TOP_IMMEDIATE, memory_cell["arg"]), "TOP = IMM"]],
             ],
             OpcodeType.DROP: [
                 [
                     [lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT), "TOP = NEXT"],
                     [lambda: self.data_path.signal_latch_sp(Selector.SP_DEC), "SP -= 1"],
                 ],
-                [
-                    [lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM), "NEXT = MEM"]
-                ],
+                [[lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM), "NEXT = MEM"]],
             ],
             OpcodeType.OMIT: [
                 [
@@ -351,82 +339,52 @@ class ControlUnit:
                     [lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT), "TOP = NEXT"],
                     [lambda: self.data_path.signal_latch_sp(Selector.SP_DEC), "SP -= 1"],
                 ],
-                [
-                    [lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM), "NEXT = MEM"]
-                ],
+                [[lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM), "NEXT = MEM"]],
                 [
                     [lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT), "TOP = NEXT"],
                     [lambda: self.data_path.signal_latch_sp(Selector.SP_DEC), "SP -= 1"],
                 ],
-                [
-                    [lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM), "NEXT = MEM"]
-                ],
+                [[lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM), "NEXT = MEM"]],
             ],
             OpcodeType.READ: [
-                [
-                    [lambda: self.data_path.signal_latch_top(Selector.TOP_IMMEDIATE, self.get_io_value()), "TOP = IO"]
-                ]
+                [[lambda: self.data_path.signal_latch_top(Selector.TOP_IMMEDIATE, self.get_io_value()), "TOP = IO"]]
             ],
             OpcodeType.SWAP: [
-                [
-                    [lambda: self.data_path.signal_latch_temp(Selector.TEMP_TOP), "TEMP = TOP"]
-                ],
-                [
-                    [lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT), "TOP = NEXT"]
-                ],
-                [
-                    [lambda: self.data_path.signal_latch_next(Selector.NEXT_TEMP), "NEXT = TEMP"]
-                ],
+                [[lambda: self.data_path.signal_latch_temp(Selector.TEMP_TOP), "TEMP = TOP"]],
+                [[lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT), "TOP = NEXT"]],
+                [[lambda: self.data_path.signal_latch_next(Selector.NEXT_TEMP), "NEXT = TEMP"]],
             ],
             OpcodeType.OVER: [
-                [
-                    [lambda: self.data_path.signal_data_wr(), "MEM = NEXT"]
-                ],
+                [[lambda: self.data_path.signal_data_wr(), "MEM = NEXT"]],
                 [
                     [lambda: self.data_path.signal_latch_temp(Selector.TEMP_TOP), "TEMP = TOP"],
                     [lambda: self.data_path.signal_latch_sp(Selector.SP_INC), "SP += 1"],
                 ],
-                [
-                    [lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT), "TOP = NEXT"]
-                ],
-                [
-                    [lambda: self.data_path.signal_latch_next(Selector.NEXT_TEMP), "NEXT = TEMP"]
-                ],
+                [[lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT), "TOP = NEXT"]],
+                [[lambda: self.data_path.signal_latch_next(Selector.NEXT_TEMP), "NEXT = TEMP"]],
             ],
             OpcodeType.DUP: [
-                [
-                    [lambda: self.data_path.signal_data_wr(), "MEM = NEXT"]
-                ],
+                [[lambda: self.data_path.signal_data_wr(), "MEM = NEXT"]],
                 [
                     [lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP), "NEXT = TOP"],
                     [lambda: self.data_path.signal_latch_sp(Selector.SP_INC), "SP += 1"],
                 ],
             ],
-            OpcodeType.LOAD: [
-                [
-                    [lambda: self.data_path.signal_latch_top(Selector.TOP_MEM), "TOP = DATA_MEMORY"]
-                ]
-            ],
+            OpcodeType.LOAD: [[[lambda: self.data_path.signal_latch_top(Selector.TOP_MEM), "TOP = DATA_MEMORY"]]],
             OpcodeType.STORE: [
                 [
                     [lambda: self.data_path.signal_mem_write(), "DATA_MEMORY = NEXT"],
-                    [lambda: self.data_path.signal_latch_sp(Selector.SP_DEC), "SP -= 1"]
+                    [lambda: self.data_path.signal_latch_sp(Selector.SP_DEC), "SP -= 1"],
                 ],
-                [
-                    [lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM), "NEXT = MEM"]
-                ],
+                [[lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM), "NEXT = MEM"]],
                 [
                     [lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT), "TOP = NEXT"],
                     [lambda: self.data_path.signal_latch_sp(Selector.SP_DEC), "SP -= 1"],
                 ],
-                [
-                    [lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM), "NEXT = MEM"]
-                ],
+                [[lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM), "NEXT = MEM"]],
             ],
             OpcodeType.POP: [
-                [
-                    [lambda: self.data_path.signal_latch_temp(Selector.TEMP_TOP), "TEMP = TOP"]
-                ],
+                [[lambda: self.data_path.signal_latch_temp(Selector.TEMP_TOP), "TEMP = TOP"]],
                 [
                     [lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT), "TOP = NEXT"],
                     [lambda: self.data_path.signal_latch_sp(Selector.SP_DEC), "SP -= 1"],
@@ -435,14 +393,10 @@ class ControlUnit:
                     [lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM), "NEXT = MEM"],
                     [lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_OUT), "RETURN_STACK = TEMP"],
                 ],
-                [
-                    [lambda: self.data_path.signal_latch_i(Selector.I_INC), "I += 1"]
-                ],
+                [[lambda: self.data_path.signal_latch_i(Selector.I_INC), "I += 1"]],
             ],
             OpcodeType.RPOP: [
-                [
-                    [lambda: self.data_path.signal_latch_i(Selector.I_DEC), "I -= 1"]
-                ],
+                [[lambda: self.data_path.signal_latch_i(Selector.I_DEC), "I -= 1"]],
                 [
                     [lambda: self.data_path.signal_latch_temp(Selector.TEMP_RETURN), "TEMP = RETURN_STACK"],
                     [lambda: self.data_path.signal_data_wr(), "MEM = NEXT"],
@@ -451,51 +405,31 @@ class ControlUnit:
                     [lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP), "NEXT = TOP"],
                     [lambda: self.data_path.signal_latch_sp(Selector.SP_INC), "SP += 1"],
                 ],
-                [
-                    [lambda: self.data_path.signal_latch_top(Selector.TOP_TEMP), "TOP = TEMP"]
-                ],
+                [[lambda: self.data_path.signal_latch_top(Selector.TOP_TEMP), "TOP = TEMP"]],
             ],
             OpcodeType.ZJMP: [
                 [
                     [lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT), "TOP = NEXT"],
                     [lambda: self.data_path.signal_latch_sp(Selector.SP_DEC), "SP -= 1"],
                 ],
-                [
-                    [lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM), "NEXT = MEM"]
-                ],
+                [[lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM), "NEXT = MEM"]],
             ],
-            OpcodeType.JMP: [
-                [
-                    [lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, memory_cell["arg"]), "PC = IMM"]
-                ]
-            ],
+            OpcodeType.JMP: [[[lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, memory_cell["arg"]), "PC = IMM"]]],
             OpcodeType.CALL: [
-                [
-                    [lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_PC), "RETURN_STACK = PC"]
-                ],
+                [[lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_PC), "RETURN_STACK = PC"]],
                 [
                     [lambda: self.data_path.signal_latch_i(Selector.I_INC), "I += 1"],
                     [lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, memory_cell["arg"]), "PC = IMM"],
                 ],
             ],
-            OpcodeType.DI: [
-                [
-                    [lambda: self.signal_latch_ps(intr_on=False), "PS[INTR_ON] = 0"]
-                ]
-            ],
-            OpcodeType.EI: [
-                [
-                    [lambda: self.signal_latch_ps(intr_on=True), "PS[INTR_ON] = 1"]
-                ]
-            ],
+            OpcodeType.DI: [[[lambda: self.signal_latch_ps(intr_on=False), "PS[INTR_ON] = 0"]]],
+            OpcodeType.EI: [[[lambda: self.signal_latch_ps(intr_on=True), "PS[INTR_ON] = 1"]]],
             OpcodeType.RET: [
-                [
-                    [lambda: self.data_path.signal_latch_i(Selector.I_DEC), "I -= 1"]
-                ],
+                [[lambda: self.data_path.signal_latch_i(Selector.I_DEC), "I -= 1"]],
                 [
                     [lambda: self.signal_latch_pc(Selector.PC_RET), "PC = RETURN_STACK"],
-                    [lambda: self.signal_latch_ps(intr_mode=False), "PS[INTR_MODE] = 0"]
-                ]
+                    [lambda: self.signal_latch_ps(intr_mode=False), "PS[INTR_MODE] = 0"],
+                ],
             ],
         }.get(command)
 
@@ -514,7 +448,7 @@ class ControlUnit:
                 [
                     [lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, memory_cell["arg"]), "PC = IMM"],
                 ],
-                "zjmp"
+                "zjmp",
             )
 
         if command == OpcodeType.HALT:
@@ -546,7 +480,7 @@ class ControlUnit:
             self.data_path.memory[self.data_path.top] if self.data_path.top < self.data_path.memory_size else "?",
             str(tos),
             str(ret_tos),
-            str("; ".join(operations))
+            str("; ".join(operations)),
         )
         logger.info(state_repr)
 
