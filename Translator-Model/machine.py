@@ -477,7 +477,6 @@ class MasterSPI:
         self.control_unit = control_unit
         self.tick_limit = limit
         self.tick_number = 0
-        self.intr_moving = False
         self.sig_read = False
         self.MISO = False
         self.MOSI = False
@@ -489,10 +488,9 @@ class MasterSPI:
 
     def tick_fall(self) -> None:
         latch_sr = self.control_unit.data_path.latch_sr
-        if latch_sr and not self.intr_moving:  # slave
+        if latch_sr and not self.sig_read:  # slave
             self.control_unit.data_path.latch_sr = False
             self.control_unit.data_path.sr = self.control_unit.data_path.sro.copy()
-            self.intr_moving = True
             self.tick_number = 0
             self.control_unit.cs = False
             self.sig_read = True
@@ -505,7 +503,6 @@ class MasterSPI:
             self.control_unit.data_path.sr[0] = self.MOSI
         if not self.control_unit.cs and self.tick_number >= 32:
             self.control_unit.cs = True
-            self.intr_moving = False
             self.write_content()
             self.tick_number = 0
             if not self.sig_read:
@@ -514,7 +511,7 @@ class MasterSPI:
             self.sig_read = False
 
     def check_for_input(self) -> None:
-        if self.control_unit.ps["Intr_On"] and not self.intr_moving and not self.control_unit.ps["Intr_Mode"]:
+        if self.control_unit.ps["Intr_On"] and self.control_unit.cs and not self.control_unit.ps["Intr_Mode"]:
             for index, interrupt in enumerate(self.control_unit.input_tokens):
                 if not self.control_unit.tokens_handled[index] and interrupt[0] <= self.control_unit.tick_number:
                     input_content = ord(interrupt[1])
@@ -524,7 +521,6 @@ class MasterSPI:
                     self.control_unit.tokens_handled[index] = True
                     self.control_unit.cs = False
                     self.tick_number = 1
-                    self.intr_moving = True
                     return
 
     def tick(self):
