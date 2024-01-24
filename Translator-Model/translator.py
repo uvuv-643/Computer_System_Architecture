@@ -371,6 +371,14 @@ def translate(source_code: str) -> list[dict]:
 
 
 def main(source_file: str, target_file: str) -> None:
+
+    global variables, variable_current_address, string_current_address, functions
+
+    variables = {}
+    variable_current_address = 512
+    string_current_address = 0
+    functions = {}
+
     with open(source_file, encoding="utf-8") as f:
         source_code = f.read()
     code = translate(source_code)
