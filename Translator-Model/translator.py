@@ -309,7 +309,6 @@ def fix_addresses_in_opcodes(term_opcodes: list[list[Opcode]]) -> list[Opcode]:
     for term_num, opcodes in enumerate(term_opcodes):
         term_opcode_cnt = len(opcodes)
         pref_sum.append(pref_sum[term_num] + term_opcode_cnt)
-    print(pref_sum)
     for term_opcode in list(filter(lambda x: x is not None, term_opcodes)):
         for opcode in term_opcode:
             for param_num, param in enumerate(opcode.params):
